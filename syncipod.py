@@ -36,29 +36,44 @@ ipod_path_prefix = 'iTunes_Control/Music'
 ipod_music_dir = os.path.join(mp, ipod_path_prefix)
 
 # Necessary on linux since filenames are just stored as bytestrings. This assumes the filenames contain utf-8 characters only
+def unnormalized(path):
+
+    unicode_path = path.decode('utf-8')
+    normalized_path = unicodedata.normalize("NFC", unicode_path)
+    decompressed_path = normalized_path.encode('utf-8')
+    
+    return decompressed_path
+
 def exists_on_disk(file):
+
     if os.path.isfile(file):
         return True
     else:
-        unicode_file = file.decode('utf-8')
-        normalized_file = unicodedata.normalize("NFC", unicode_file)
-        decompressed_file = normalized_file.encode('utf-8')
+        reencoded_file = unnormalized(file)
 		
-        if os.path.isfile(decompressed_file):
+        if os.path.isfile(reencoded_file):
             return True
         else:
             return False
 	
+deleted_files = []
+new_files = []
+
+print "Determining tracks to sync..."
+
 for r,d,f in os.walk(ipod_music_dir):
     for files in f:
         if any(files.endswith(x) for x in music_formats):
-            full_ipod_filepath = os.path.join(r, files)
+            full_ipod_filepath = os.path.join(r, files)                    # This is the path to the file on the ipod
             relative_filepath = full_ipod_filepath[len(ipod_music_dir)+1:] # This gives us 'Artist/Album/Song.mp3'
-            full_local_filepath = os.path.join(music_dir, relative_filepath)
+            full_local_filepath = os.path.join(music_dir, relative_filepath) # This is the path to the local file
             if not exists_on_disk(full_local_filepath):
                 print "Deleting from iPod: " + relative_filepath
                 os.remove(full_ipod_filepath)
-			
+                ipod_path = unnormalized(full_ipod_filepath)[len(mp):].replace('/',':')
+                deleted_files.append(ipod_path)
+
+i = 1			
 for r,d,f in os.walk(music_dir):
     for files in f:
         if any(files.endswith(x) for x in music_formats):
@@ -73,47 +88,45 @@ for r,d,f in os.walk(music_dir):
                     os.rename(full_local_filepath, full_local_filepath.replace("#","_"))
                     full_local_filepath = full_local_filepath.replace("#","_")
                     relative_filepath = relative_filepath.replace("#","_")
-                print "Copying: " + relative_filepath
                 subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
+                new_files.append(full_ipod_filepath)
             else:
                 if os.path.getsize(full_local_filepath) != os.path.getsize(full_ipod_filepath):
                     if "#" in full_local_filepath:
                         os.rename(full_local_filepath, full_local_filepath.replace("#","_"))
                         full_local_filepath = full_local_filepath.replace("#","_")
                         relative_filepath = relative_filepath.replace("#","_")
-                    print "Updating: " + relative_filepath
                     subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
-					
+                    new_files.append(full_ipod_filepath)
+                    deleted_files.append(full_ipod_filepath[len(mp):].replace('/',':'))
+            print i
+            i += 1
 ### Done syncing the music directory with the ipod. Now let's rebuild the database with
 ### the new changes.
 
 db = gpod.itdb_parse(mp, None)
 
-### First delete everything from ipod database
-tracks = gpod.sw_get_tracks(db)
-for track in tracks:
-	
-    # Remove it from any playlists it might be on
-    for pl in gpod.sw_get_playlists(db):
-        if gpod.itdb_playlist_contains_track(pl, track):
-            gpod.itdb_playlist_remove_track(pl, track)
+### First delete the removed/modified files from ipod database. This is an annoying part because we can only lookup track by id
+### but we don't have an id, so we basically need to check every track to see if its been deleted/modified
+if deleted_files:   
+    print "Removing deleted & outdated tracks from the ipod database"
+    tracks = gpod.sw_get_tracks(db)
+    for track in tracks:
+        if track.ipod_path in deleted_files:
+        # Remove it from any playlists it might be on
+            for pl in gpod.sw_get_playlists(db):
+                if gpod.itdb_playlist_contains_track(pl, track):
+                    gpod.itdb_playlist_remove_track(pl, track)
     
-    # Remove it from the master playlist
-    gpod.itdb_playlist_remove_track(gpod.itdb_playlist_mpl(db), track)
+            # Remove it from the master playlist
+            gpod.itdb_playlist_remove_track(gpod.itdb_playlist_mpl(db), track)
     
-    # Remove it from the database
-    gpod.itdb_track_remove(track)
+            # Remove it from the database
+            gpod.itdb_track_remove(track)
     
-### Now lets add everything from our music directory, deleting any files that don't exist locally
-
-songs = []
-
-for r,d,f in os.walk(ipod_music_dir):
-    for files in f:
-        if any(files.endswith(x) for x in music_formats):
-            songs.append(os.path.join(r, files))
-            
-for song in songs:
+### Now lets add everything new/modified from our music directory
+print "Updating the database with new/modified tracks..."
+for song in new_files:
     
     try:
         f = MediaFile(song)
@@ -133,8 +146,8 @@ for song in songs:
     track.composer = f.composer.encode('utf-8')
     track.grouping = f.grouping.encode('utf-8')
 
-    track.sort_artist = f.artist_sort.encode('utf-8')
-    track.sort_albumartist = f.albumartist_sort.encode('utf-8')
+    #track.sort_artist = f.artist_sort.encode('utf-8')
+    #track.sort_albumartist = f.albumartist_sort.encode('utf-8')
 	
     #track.size = f.size
     track.tracklen = f.length * 1000
@@ -157,4 +170,7 @@ for song in songs:
     gpod.itdb_playlist_add_track(gpod.itdb_playlist_mpl(db), track, -1)
     
 # Write the database
-gpod.itdb_write(db, None)
+if not (new_files or deleted_files):
+	print "Not syncing: No files have been added, modified or removed."
+else:	
+	gpod.itdb_write(db, None)
