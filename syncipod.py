@@ -89,7 +89,7 @@ for r,d,f in os.walk(music_dir):
                     full_local_filepath = full_local_filepath.replace("#","_")
                     relative_filepath = relative_filepath.replace("#","_")
                 subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
-                new_files.append(full_ipod_filepath)
+                new_files.append((full_local_filepath, full_ipod_filepath))
             else:
                 if os.path.getsize(full_local_filepath) != os.path.getsize(full_ipod_filepath):
                     if "#" in full_local_filepath:
@@ -97,7 +97,7 @@ for r,d,f in os.walk(music_dir):
                         full_local_filepath = full_local_filepath.replace("#","_")
                         relative_filepath = relative_filepath.replace("#","_")
                     subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
-                    new_files.append(full_ipod_filepath)
+                    new_files.append((full_local_filepath, full_ipod_filepath))
                     deleted_files.append(full_ipod_filepath[len(mp):].replace('/',':'))
             print i
             i += 1
@@ -125,18 +125,19 @@ if deleted_files:
             gpod.itdb_track_remove(track)
     
 ### Now lets add everything new/modified from our music directory
+### We'll use the local files to get the metadata to speed things up....
 print "Updating the database with new/modified tracks..."
-for song in new_files:
+for full_local_filepath, full_ipod_filepath in new_files:
     
     try:
-        f = MediaFile(song)
+        f = MediaFile(full_local_filepath)
     except:
-        print "Error reading '" + song + "'"
+        print "Error reading '" + full_local_filepath + "'"
         continue
 
     track = gpod.itdb_track_new()
     track.title = f.title.encode('utf-8')
-    track.ipod_path = song[len(mp):].replace('/',':')
+    track.ipod_path = full_ipod_filepath[len(mp):].replace('/',':')
     track.album = f.album.encode('utf-8')
     track.artist = f.artist.encode('utf-8')
     track.albumartist = f.albumartist.encode('utf-8')
