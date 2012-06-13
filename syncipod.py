@@ -72,8 +72,7 @@ for r,d,f in os.walk(ipod_music_dir):
                 os.remove(full_ipod_filepath)
                 ipod_path = unnormalized(full_ipod_filepath)[len(mp):].replace('/',':')
                 deleted_files.append(ipod_path)
-
-i = 1			
+		
 for r,d,f in os.walk(music_dir):
     for files in f:
         if any(files.endswith(x) for x in music_formats):
@@ -88,6 +87,7 @@ for r,d,f in os.walk(music_dir):
                     os.rename(full_local_filepath, full_local_filepath.replace("#","_"))
                     full_local_filepath = full_local_filepath.replace("#","_")
                     relative_filepath = relative_filepath.replace("#","_")
+                print "Copying: " + full_local_filepath
                 subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
                 new_files.append((full_local_filepath, full_ipod_filepath))
             else:
@@ -96,11 +96,11 @@ for r,d,f in os.walk(music_dir):
                         os.rename(full_local_filepath, full_local_filepath.replace("#","_"))
                         full_local_filepath = full_local_filepath.replace("#","_")
                         relative_filepath = relative_filepath.replace("#","_")
+                    print "Copying: " + full_local_filepath
                     subprocess.call(["gvfs-copy", full_local_filepath, "afc://" + uuid + "/" + ipod_path_prefix + "/" + relative_filepath])
                     new_files.append((full_local_filepath, full_ipod_filepath))
                     deleted_files.append(full_ipod_filepath[len(mp):].replace('/',':'))
-            print i
-            i += 1
+
 ### Done syncing the music directory with the ipod. Now let's rebuild the database with
 ### the new changes.
 
