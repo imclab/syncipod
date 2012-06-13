@@ -142,7 +142,7 @@ for full_local_filepath, full_ipod_filepath in new_files:
     track.artist = f.artist.encode('utf-8')
     track.albumartist = f.albumartist.encode('utf-8')
     track.genre = f.genre.encode('utf-8')
-    track.filetype = song.split('.')[-1]
+    track.filetype = full_local_filepath.split('.')[-1]
     track.comment = f.comments.encode('utf-8')
     track.composer = f.composer.encode('utf-8')
     track.grouping = f.grouping.encode('utf-8')
