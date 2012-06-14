@@ -59,6 +59,10 @@ def exists_on_disk(file):
 deleted_files = []
 new_files = []
 
+if not os.path.exists(mp):
+	print "iPod doesn't appear to be mounted. Sending mount command..."
+	subprocess.call(["gvfs-mount", "afc://" + uuid])
+
 print "Determining tracks to sync..."
 
 for r,d,f in os.walk(ipod_music_dir):
