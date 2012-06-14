@@ -2,12 +2,12 @@
 
 #
 # Simple file to keep your iPod/iPhone in sync with a directory on your
-# hard drive. It's a bit inefficient because it rebuilds the database each time, but it's 5x faster than using any of
+# hard drive. it's much faster than using any of
 # the Linux/iPod syncing tools because it uses gvfs-copy instead of fuse.
 #
 # ISSUES:
 # - Does not copy artwork (yet)
-# - Only tested with iOS 4.3.3 (with DBVersion changed from 5->4)
+# - Only tested with iOS 4.3.3 (with DBVersion changed from 5->4). ymmv
 #
 # NOTE: You may need to change python2 to python above to work on your system
 #
